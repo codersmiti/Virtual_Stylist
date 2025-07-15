@@ -332,8 +332,9 @@ def process_glasses():
 
     gray = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
 
-    face_cascade = cv.CascadeClassifier('static\cascades\haarcascade_frontalface_alt.xml')
-    eye_cascade = cv.CascadeClassifier('static\cascades\haarcascade_eye.xml')
+    face_cascade = cv2.CascadeClassifier("static/cascades/haarcascade_frontalface_alt.xml")
+    eye_cascade = cv2.CascadeClassifier("static/cascades/haarcascade_eye.xml")
+
 
     #gray = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
     image = cv.cvtColor(image, cv.COLOR_BGR2BGRA)
