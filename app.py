@@ -43,6 +43,15 @@ bootstrap = Bootstrap(app)
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
+# === Load dlib models once to save memory and avoid repeated downloads ===
+MODEL_PATH = "models/shape_predictor_68_face_landmarks.dat"
+if not os.path.exists(MODEL_PATH):
+    os.makedirs("models", exist_ok=True)
+    url = "https://drive.google.com/uc?id=1Y3ACTjJCPvYaNTTHRXJRQBqAt5wvDLjq"
+    gdown.download(url, MODEL_PATH, quiet=False)
+
+predictor = dlib.shape_predictor(MODEL_PATH)
+detector = dlib.get_frontal_face_detector()
 
 class User(UserMixin, db.Model):
     sno = db.Column(db.Integer, primary_key=True)
@@ -453,17 +462,7 @@ def process_necklace():
     image1 = necklace[y:h, x:w]
 
     detector = dlib.get_frontal_face_detector()
-    import gdown
-    import os
-
-    # Create a folder to store the model if it doesn't exist
-    os.makedirs("models", exist_ok=True)
-
-    # Download using gdown
-    url = "https://drive.google.com/uc?id=1Y3ACTjJCPvYaNTTHRXJRQBqAt5wvDLjq"
-    output_path = "models/shape_predictor_68_face_landmarks.dat"
-    gdown.download(url, output_path, quiet=False)
-    predictor = dlib.shape_predictor("models/shape_predictor_68_face_landmarks.dat")
+    predictor = dlib.shape_predictor()
 
     height, width, _ = image.shape
 
@@ -623,23 +622,19 @@ def process_lips():
     # print(lip_color)
 
     def get_lip_landmark(img):
-        '''Finding lip landmark and return list of corresponded coordinations'''
-        detector = dlib.get_frontal_face_detector()
-        url = "https://drive.google.com/uc?id=1Y3ACTjJCPvYaNTTHRXJRQBqAt5wvDLjq"
-        output_path = "models/shape_predictor_68_face_landmarks.dat"
-        gdown.download(url, output_path, quiet=False)
-        predictor = dlib.shape_predictor("models/shape_predictor_68_face_landmarks.dat")
+        '''Finding lip landmark and return list of corresponded coordinates'''
         gray_img = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
-
-        faces = detector(gray_img)
+        faces = detector(gray_img)  # uses global detector
         for face in faces:
-            landmarks = predictor(gray_img, face)
+            landmarks = predictor(gray_img, face)  # uses global predictor
             lmPoints = []
             for n in range(48, 68):
                 x = landmarks.part(n).x
                 y = landmarks.part(n).y
                 lmPoints.append([x, y])
-        return lmPoints
+            return lmPoints
+        return []  # Return empty if no face detected
+
     
     def change_lip_color(img, color):
         '''Change lip color based on given color option'''
