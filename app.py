@@ -617,20 +617,32 @@ def process_lips():
     # print(lip_color)
 
     def get_lip_landmark(img):
-        '''Finding lip landmark and return list of corresponded coordinates'''
+        """Finds lip landmarks and returns a list of corresponding coordinates."""
+        global detector, predictor
+    
+        # Ensure the dlib model is downloaded
+        ensure_predictor_downloaded()
+    
+        # Lazy-load detector and predictor if not already initialized
+        if 'detector' not in globals() or detector is None:
+            detector = dlib.get_frontal_face_detector()
+        if 'predictor' not in globals() or predictor is None:
+            predictor = dlib.shape_predictor(MODEL_PATH)
+    
+        # Convert to grayscale and detect faces
         gray_img = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
-        faces = detector(gray_img)  # uses global detector
+        faces = detector(gray_img)
+    
         for face in faces:
-            landmarks = predictor(gray_img, face)  # uses global predictor
+            landmarks = predictor(gray_img, face)
             lmPoints = []
-            for n in range(48, 68):
+            for n in range(48, 68):  # Lip landmarks
                 x = landmarks.part(n).x
                 y = landmarks.part(n).y
                 lmPoints.append([x, y])
             return lmPoints
-        return []  # Return empty if no face detected
-
     
+        return []
     def change_lip_color(img, color):
         '''Change lip color based on given color option'''
         img_original = img.copy()
