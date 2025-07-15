@@ -385,112 +385,97 @@ def process_glasses():
     
     return render_template('tryon_result.html', image=processed_image_base64, tryon_type='Glass')
 
-@app.route('/tryon/necklace')
-def tryon_necklace():
-    image_data = request.args.get('uploaded-image')
-    return render_template('tryon_necklace.html', image_data=image_data)
-
 @app.route('/process/necklace', methods=['POST'])
 def process_necklace():
     image_data = request.form['imageData']
     necklace_file = request.files['necklace']
 
-    image_bytes = image_data.split(",")[1]  
+    image_bytes = image_data.split(",")[1]
     nparr = np.frombuffer(base64.b64decode(image_bytes), np.uint8)
 
     image = cv.imdecode(nparr, cv.IMREAD_UNCHANGED)
     necklace = cv.imdecode(np.frombuffer(necklace_file.read(), np.uint8), cv.IMREAD_UNCHANGED)
 
-    if image is None:
-            return jsonify({'error': 'Received image is empty'})
-    
+    if image is None or necklace is None:
+        return jsonify({'error': 'Invalid image or necklace'})
+
     def fit_factor(dim, dis):
-        fac = round(dis / dim, 2)
-        return fac
+        return round(dis / dim, 2)
 
     def map_factor(img_dim, s2, tar_dim):
-        if tar_dim[1] > img_dim[0] - (s2 + 80):
-            new_dim = img_dim[0] - (s2 + 40)
-        else:
-            new_dim = tar_dim[1]
-        return new_dim
+        return img_dim[0] - (s2 + 40) if tar_dim[1] > img_dim[0] - (s2 + 80) else tar_dim[1]
 
     def acc_crop_side(image):
         gray = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
         gray = cv.GaussianBlur(gray, (5, 5), 0)
-        ret, mask = cv.threshold(gray, 220, 255, cv.THRESH_BINARY_INV)
-        cnts = cv.findContours(mask.copy(), cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
-        cnts = imutils.grab_contours(cnts)
+        _, mask = cv.threshold(gray, 220, 255, cv.THRESH_BINARY_INV)
+        cnts = imutils.grab_contours(cv.findContours(mask.copy(), cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE))
+        if not cnts:
+            raise ValueError("No contour found in necklace image.")
         c = max(cnts, key=cv.contourArea)
-        extTop = tuple(c[c[:, :, 1].argmin()][0])
-        return extTop
+        return tuple(c[c[:, :, 1].argmin()][0])
 
     def acc_crop_bottom(image):
         gray = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
         gray = cv.GaussianBlur(gray, (5, 5), 0)
-        ret, mask = cv.threshold(gray, 220, 255, cv.THRESH_BINARY_INV)
-        cnts = cv.findContours(mask.copy(), cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
-        cnts = imutils.grab_contours(cnts)
+        _, mask = cv.threshold(gray, 220, 255, cv.THRESH_BINARY_INV)
+        cnts = imutils.grab_contours(cv.findContours(mask.copy(), cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE))
+        if not cnts:
+            raise ValueError("No contour found in necklace image.")
         c = max(cnts, key=cv.contourArea)
-        extBot = tuple(c[c[:, :, 1].argmax()][0])
-        extRight = tuple(c[c[:, :, 0].argmax()][0])
-        extLeft = tuple(c[c[:, :, 0].argmin()][0])
-        return extBot, extRight, extLeft
+        return (
+            tuple(c[c[:, :, 1].argmax()][0]),
+            tuple(c[c[:, :, 0].argmax()][0]),
+            tuple(c[c[:, :, 0].argmin()][0])
+        )
 
     def acc_cor_points(oimage):
-        first_half = oimage[0:oimage.shape[1], 0:int(oimage.shape[0] / 2)]
-        second_half = oimage[0:oimage.shape[1], int(oimage.shape[0] / 2):oimage.shape[0]]
+        first_half = oimage[0:oimage.shape[1], 0:oimage.shape[0] // 2]
+        second_half = oimage[0:oimage.shape[1], oimage.shape[0] // 2:]
         topl = acc_crop_side(first_half)
         topr = acc_crop_side(second_half)
         bot, right, left = acc_crop_bottom(oimage)
-        dis = (int(oimage.shape[0] / 2) + topr[0])
-        if topl[1] > topr[1]:
-            y = topr[1]
-        else:
-            y = topl[1]
-        if topl[0] > left[0]:
-            x = left[0]
-        else:
-            x = topl[0]
-        if dis > right[0]:
-            w = dis
-        else:
-            w = right[0]
+        dis = (oimage.shape[0] // 2) + topr[0]
+        x = min(topl[0], left[0])
+        y = min(topl[1], topr[1])
+        w = max(dis, right[0])
         h = bot[1]
         return x, y, w, h
-    
-    x, y, w, h = acc_cor_points(necklace)
-    image1 = necklace[y:h, x:w]
 
-    detector = dlib.get_frontal_face_detector()
-    predictor = dlib.shape_predictor()
-
-    height, width, _ = image.shape
+    try:
+        x, y, w, h = acc_cor_points(necklace)
+        image1 = necklace[y:h, x:w]
+    except Exception as e:
+        return jsonify({'error': f'Failed to crop necklace: {str(e)}'})
 
     gray = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
     rects = detector(gray, 1)
 
-    for (i, rect) in enumerate(rects):
-        shape = predictor(gray, rect)
-        shape = face_utils.shape_to_np(shape)
+    if len(rects) == 0:
+        return jsonify({'error': 'No face detected in image'})
 
-        (s1, s2) = shape[3]  # Example landmarks, adjust as needed
-        (e1, e2) = shape[13]  # Example landmarks, adjust as needed
+    shape = predictor(gray, rects[0])
+    shape = face_utils.shape_to_np(shape)
+
+    if shape.shape[0] < 14:
+        return jsonify({'error': 'Face detected but landmarks insufficient'})
+
+    try:
+        (s1, s2) = shape[3]
+        (e1, e2) = shape[13]
         dis = e1 - s1
         dim = image1.shape[1]
 
         m_factor = fit_factor(dim, dis)
         p_dim = (int(image1.shape[1] * m_factor), int(image1.shape[0] * m_factor))
         mf = map_factor(image.shape, s2, p_dim)
-        if mf == p_dim[0]:
-            dim = p_dim
-        else:
-            dim = (p_dim[0], mf)
+        dim = p_dim if mf == p_dim[0] else (p_dim[0], mf)
 
         resized = cv.resize(image1, dim, interpolation=cv.INTER_AREA)
         img2gray = cv.cvtColor(resized, cv.COLOR_BGR2GRAY)
-        ret, mask = cv.threshold(img2gray, 220, 255, cv.THRESH_BINARY_INV)
+        _, mask = cv.threshold(img2gray, 220, 255, cv.THRESH_BINARY_INV)
         mask_inv = cv.bitwise_not(mask)
+
         resized1 = cv.resize(resized, (resized.shape[1] * 10, resized.shape[0] * 10), interpolation=cv.INTER_AREA)
         mask = cv.resize(mask, (resized.shape[1] * 10, resized.shape[0] * 10), interpolation=cv.INTER_AREA)
         mask_inv = cv.resize(mask_inv, (resized.shape[1] * 10, resized.shape[0] * 10), interpolation=cv.INTER_AREA)
@@ -501,24 +486,22 @@ def process_necklace():
 
         roi_bg = cv.bitwise_and(roi, roi, mask=mask_inv)
         roi_fg = cv.bitwise_and(resized1, resized1, mask=mask)
-
         roi_fg_rgb = cv.cvtColor(roi_fg, cv.COLOR_BGRA2BGR)
+
         dst1 = cv.add(roi_bg, roi_fg_rgb)
-        dst = cv.resize(dst1, (int(dst1.shape[1] / 10), int(dst1.shape[0] / 10)), interpolation=cv.INTER_AREA)
+        dst = cv.resize(dst1, (dst1.shape[1] // 10, dst1.shape[0] // 10), interpolation=cv.INTER_AREA)
 
         image[point1:point1 + dim[1], s1:s1 + dim[0]] = dst
-    
-      
-    # image = cv.cvtColor(image, cv.COLOR_BGRA2RGB)
-    processed_image = image
-    # processed_image = cv.cvtColor(processed_image, cv.COLOR_BGR2RGB)
-    cv.imwrite('output-necklace.png', processed_image)
-   
-    _, processed_image_data = cv.imencode('.png', processed_image)
+    except Exception as e:
+        return jsonify({'error': f'Necklace overlay failed: {str(e)}'})
+
+    cv.imwrite('output-necklace.png', image)
+    _, processed_image_data = cv.imencode('.png', image)
     processed_image_bytes = processed_image_data.tobytes()
     processed_image_base64 = base64.b64encode(processed_image_bytes).decode('utf-8')
-    
+
     return render_template('tryon_result.html', image=processed_image_base64, tryon_type='Necklace')
+
 
 @app.route('/tryon/earring')
 def tryon_earrings():
