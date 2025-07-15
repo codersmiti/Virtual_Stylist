@@ -458,6 +458,12 @@ def process_necklace():
         image1 = necklace[y:h, x:w]
     except Exception as e:
         return jsonify({'error': f'Failed to crop necklace: {str(e)}'})
+    ensure_predictor_downloaded()
+    global detector, predictor
+    if 'detector' not in globals() or detector is None:
+        detector = dlib.get_frontal_face_detector()
+    if 'predictor' not in globals() or predictor is None:
+        predictor = dlib.shape_predictor(MODEL_PATH)
 
     gray = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
     rects = detector(gray, 1)
