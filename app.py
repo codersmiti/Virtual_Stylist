@@ -30,6 +30,7 @@ from flask_login import LoginManager, UserMixin, login_user, logout_user, login_
 import time
 import jsonpickle
 import wtforms
+import requests
 
 app = Flask(__name__, static_folder='static')
 app.secret_key = 'smi'
@@ -46,22 +47,21 @@ login_manager.login_view = 'login'
 # === Load dlib models once to save memory and avoid repeated downloads ===
 # === Load dlib models once to save memory and avoid repeated downloads ===
 MODEL_PATH = "models/shape_predictor_68_face_landmarks.dat"
-MODEL_URL = "https://drive.google.com/uc?id=1Y3ACTjJCPvYaNTTHRXJRQBqAt5wvDLjq"
+HF_MODEL_URL = "https://huggingface.co/Smiti24/Model/resolve/main/shape_predictor_68_face_landmarks.dat"
 
 def ensure_predictor_downloaded():
-    """Download the dlib predictor model if not already present."""
+    """Download the dlib predictor model from Hugging Face if not already present."""
     if not os.path.exists(MODEL_PATH):
-        os.makedirs("models", exist_ok=True)
-        import gdown
-        gdown.download(MODEL_URL, MODEL_PATH, quiet=False)
+        os.makedirs(os.path.dirname(MODEL_PATH), exist_ok=True)
+        response = requests.get(HF_MODEL_URL, stream=True)
+        if response.status_code == 200:
+            with open(MODEL_PATH, 'wb') as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    f.write(chunk)
+        else:
+            raise Exception(f"Failed to download model from Hugging Face: {response.status_code}")
 
-# Ensure it's triggered only once after app is ready
-@app.before_first_request
-def setup_dlib_models():
-    ensure_predictor_downloaded()
-    global predictor, detector
-    predictor = dlib.shape_predictor(MODEL_PATH)
-    detector = dlib.get_frontal_face_detector()
+
 
 
 class User(UserMixin, db.Model):
