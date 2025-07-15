@@ -44,14 +44,25 @@ login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
 # === Load dlib models once to save memory and avoid repeated downloads ===
+# === Load dlib models once to save memory and avoid repeated downloads ===
 MODEL_PATH = "models/shape_predictor_68_face_landmarks.dat"
-if not os.path.exists(MODEL_PATH):
-    os.makedirs("models", exist_ok=True)
-    url = "https://drive.google.com/uc?id=1Y3ACTjJCPvYaNTTHRXJRQBqAt5wvDLjq"
-    gdown.download(url, MODEL_PATH, quiet=False)
+MODEL_URL = "https://drive.google.com/uc?id=1Y3ACTjJCPvYaNTTHRXJRQBqAt5wvDLjq"
 
-predictor = dlib.shape_predictor(MODEL_PATH)
-detector = dlib.get_frontal_face_detector()
+def ensure_predictor_downloaded():
+    """Download the dlib predictor model if not already present."""
+    if not os.path.exists(MODEL_PATH):
+        os.makedirs("models", exist_ok=True)
+        import gdown
+        gdown.download(MODEL_URL, MODEL_PATH, quiet=False)
+
+# Ensure it's triggered only once after app is ready
+@app.before_first_request
+def setup_dlib_models():
+    ensure_predictor_downloaded()
+    global predictor, detector
+    predictor = dlib.shape_predictor(MODEL_PATH)
+    detector = dlib.get_frontal_face_detector()
+
 
 class User(UserMixin, db.Model):
     sno = db.Column(db.Integer, primary_key=True)
