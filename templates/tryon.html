@@ -92,7 +92,6 @@
     <div class="btn-column">
         <button class="btn-circle" id="btnShirt"><img src="{{ url_for('static', filename='tshirt.png') }}" alt="Shirt"></button>
         <button class="btn-circle" id="btnNecklace"><img src="{{ url_for('static', filename='necklace.png') }}" alt="necklace"></button>
-        <button class="btn-circle" id="btnHair"><img src="{{ url_for('static', filename='hair-cut-tool.png') }}" alt="hair"></button>
     </div>
     <!-- Display uploaded image -->
     <img id="uploaded-image" src="{{ url_for('static', filename='placeholder.png') }}" alt="Placeholder Image">
@@ -156,11 +155,6 @@
     window.location.href = '/tryon/necklace'; // Redirect to necklace try-on page
   });
 
-  document.getElementById('btnHair').addEventListener('click', function() {
-    var imageData = document.getElementById('uploaded-image').src;
-    sessionStorage.setItem('imageData', imageData);
-    window.location.href = '/tryon/hair'; // Redirect to hair try-on page
-  });
 
   document.getElementById('btnLip').addEventListener('click', function() {
     var imageData = document.getElementById('uploaded-image').src;

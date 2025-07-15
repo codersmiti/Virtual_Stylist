@@ -4,6 +4,8 @@ import matplotlib.pyplot as plt
 import cv2 as cv
 import base64
 import imutils
+import os
+import gdown
 from imutils import face_utils
 import dlib
 import subprocess
@@ -451,7 +453,17 @@ def process_necklace():
     image1 = necklace[y:h, x:w]
 
     detector = dlib.get_frontal_face_detector()
-    predictor = dlib.shape_predictor('static\misc\shape_predictor_68_face_landmarks.dat')
+    import gdown
+    import os
+
+    # Create a folder to store the model if it doesn't exist
+    os.makedirs("models", exist_ok=True)
+
+    # Download using gdown
+    url = "https://drive.google.com/uc?id=1Y3ACTjJCPvYaNTTHRXJRQBqAt5wvDLjq"
+    output_path = "models/shape_predictor_68_face_landmarks.dat"
+    gdown.download(url, output_path, quiet=False)
+    predictor = dlib.shape_predictor("models/shape_predictor_68_face_landmarks.dat")
 
     height, width, _ = image.shape
 
@@ -613,7 +625,10 @@ def process_lips():
     def get_lip_landmark(img):
         '''Finding lip landmark and return list of corresponded coordinations'''
         detector = dlib.get_frontal_face_detector()
-        predictor = dlib.shape_predictor('static\misc\shape_predictor_68_face_landmarks.dat')
+        url = "https://drive.google.com/uc?id=1Y3ACTjJCPvYaNTTHRXJRQBqAt5wvDLjq"
+        output_path = "models/shape_predictor_68_face_landmarks.dat"
+        gdown.download(url, output_path, quiet=False)
+        predictor = dlib.shape_predictor("models/shape_predictor_68_face_landmarks.dat")
         gray_img = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
 
         faces = detector(gray_img)
@@ -666,41 +681,59 @@ def process_lips():
     
     return render_template('tryon_result.html', image=processed_image_base64, tryon_type='Lip Color')
 
-@app.route('/tryon/hair')
-def tryon_hairstyle():
-    image_data = request.args.get('uploaded-image')
-    return render_template('tryon_hairstyle.html', image_data=image_data)
+# @app.route('/tryon/hair')
+# def tryon_hairstyle():
+#     image_data = request.args.get('uploaded-image')
+#     return render_template('tryon_hairstyle.html', image_data=image_data)
 
-@app.route('/process/hairstyle', methods=['POST'])
-def process_hairstyle():
-    image_data = request.form['imageData']
-    hairstyle_file = request.files['hairstyle']
+# @app.route('/process/hairstyle', methods=['POST'])
+# def process_hairstyle():
+#     image_data = request.form['imageData']
+#     hairstyle_file = request.files['hairstyle']
 
-    image_bytes = image_data.split(",")[1]  
-    nparr = np.frombuffer(base64.b64decode(image_bytes), np.uint8)
+#     image_bytes = image_data.split(",")[1]  
+#     nparr = np.frombuffer(base64.b64decode(image_bytes), np.uint8)
 
-    image = cv.imdecode(nparr, cv.IMREAD_UNCHANGED)
-    hairstyle = cv.imdecode(np.frombuffer(hairstyle_file.read(), np.uint8), cv.IMREAD_UNCHANGED)
+#     image = cv.imdecode(nparr, cv.IMREAD_UNCHANGED)
+#     hairstyle = cv.imdecode(np.frombuffer(hairstyle_file.read(), np.uint8), cv.IMREAD_UNCHANGED)
 
-    cv.imwrite('hairstyle-try-on/1.jpg', image)
-    cv.imwrite('hairstyle-try-on/hairstyle.jpg', hairstyle)
+#     cv.imwrite('hairstyle-try-on/1.jpg', image)
+#     cv.imwrite('hairstyle-try-on/hairstyle.jpg', hairstyle)
+#     # === Download face segmentation model ===
+#     # === Step 1: Create necessary directories ===
+#     os.makedirs("image_segmentation", exist_ok=True)
+#     os.makedirs("checkpoints", exist_ok=True)
 
-    if image is None:
-            return jsonify({'error': 'Received image is empty'})
+#     # === Step 2: Download using gdown ===
+
+#     # Face segmentation model
+#     face_seg_url = "https://drive.google.com/uc?id=18niKm4oKM1TKM4HUvzVcWjLYSTrC5Ixm"
+#     face_seg_path = "image_segmentation/face_segment_checkpoints_256.pth.tar"
+#     if not os.path.exists(face_seg_path):
+#         gdown.download(face_seg_url, face_seg_path, quiet=False)
+
+#     # SDEdit hairstyle model
+#     sdedit_url = "https://drive.google.com/uc?id=1wSoA5fm_d6JBZk4RZ1SzWLMgev4WqH21"
+#     sdedit_path = "checkpoints/celeba_hq.ckpt"
+#     if not os.path.exists(sdedit_path):
+#         gdown.download(sdedit_url, sdedit_path, quiet=False)
+
+#     if image is None:
+#             return jsonify({'error': 'Received image is empty'})
     
-    cmd_process_0 = "cd hairstyle-try-on && python inference.py --seg_model_path image_segmentation/face_segment_checkpoints_256.pth.tar --t 500 --target_image_path 1.jpg --source_image_path hairstyle.jpg"
+#     cmd_process_0 = "cd hairstyle-try-on && python inference.py --seg_model_path image_segmentation/face_segment_checkpoints_256.pth.tar --t 500 --target_image_path 1.jpg --source_image_path hairstyle.jpg"
     
-    # cmd_process = "python hairstyle-try-on/inference.py --seg_model_path hairstyle-try-on/image_segmentation/face_segment_checkpoints_256.pth.tar --t 500 --target_image_path hairstyle-try-on/hairstyle.jpg --source_image_path hairstyle-try-on/1.jpg"
-    subprocess.call(cmd_process_0, shell=True)
+#     # cmd_process = "python hairstyle-try-on/inference.py --seg_model_path hairstyle-try-on/image_segmentation/face_segment_checkpoints_256.pth.tar --t 500 --target_image_path hairstyle-try-on/hairstyle.jpg --source_image_path hairstyle-try-on/1.jpg"
+#     subprocess.call(cmd_process_0, shell=True)
     
-    processed_image_path = 'hairstyle-try-on/exp/image_samples/images/original_input.png'
+#     processed_image_path = 'hairstyle-try-on/exp/image_samples/images/original_input.png'
 
-    with open(processed_image_path, "rb") as image_file:
-        processed_image_bytes = image_file.read()
+#     with open(processed_image_path, "rb") as image_file:
+#         processed_image_bytes = image_file.read()
 
-    processed_image_base64 = base64.b64encode(processed_image_bytes).decode('utf-8')
+#     processed_image_base64 = base64.b64encode(processed_image_bytes).decode('utf-8')
     
-    return render_template('tryon_result.html', image=processed_image_base64, tryon_type='Hairstyle')
+#     return render_template('tryon_result.html', image=processed_image_base64, tryon_type='Hairstyle')
 
 if __name__ == "__main__":
     app.run(debug=True)
