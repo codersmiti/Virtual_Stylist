@@ -48,7 +48,8 @@ login_manager.login_view = 'login'
 # === Load dlib models once to save memory and avoid repeated downloads ===
 MODEL_PATH = "models/shape_predictor_68_face_landmarks.dat"
 HF_MODEL_URL = "https://huggingface.co/Smiti24/Model/resolve/main/shape_predictor_68_face_landmarks.dat"
-
+predictor = None
+detector = None
 def ensure_predictor_downloaded():
     """Download the dlib predictor model from Hugging Face if not already present."""
     if not os.path.exists(MODEL_PATH):
@@ -62,6 +63,9 @@ def ensure_predictor_downloaded():
             raise Exception(f"Failed to download model from Hugging Face: {response.status_code}")
 
 
+ensure_predictor_downloaded()
+predictor = dlib.shape_predictor(MODEL_PATH)
+detector = dlib.get_frontal_face_detector()
 
 
 class User(UserMixin, db.Model):
@@ -458,12 +462,6 @@ def process_necklace():
         image1 = necklace[y:h, x:w]
     except Exception as e:
         return jsonify({'error': f'Failed to crop necklace: {str(e)}'})
-    ensure_predictor_downloaded()
-    global detector, predictor
-    if 'detector' not in globals() or detector is None:
-        detector = dlib.get_frontal_face_detector()
-    if 'predictor' not in globals() or predictor is None:
-        predictor = dlib.shape_predictor(MODEL_PATH)
 
     gray = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
     rects = detector(gray, 1)
@@ -624,18 +622,6 @@ def process_lips():
 
     def get_lip_landmark(img):
         """Finds lip landmarks and returns a list of corresponding coordinates."""
-        global detector, predictor
-    
-        # Ensure the dlib model is downloaded
-        ensure_predictor_downloaded()
-    
-        # Lazy-load detector and predictor if not already initialized
-        if 'detector' not in globals() or detector is None:
-            detector = dlib.get_frontal_face_detector()
-        if 'predictor' not in globals() or predictor is None:
-            predictor = dlib.shape_predictor(MODEL_PATH)
-    
-        # Convert to grayscale and detect faces
         gray_img = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
         faces = detector(gray_img)
     
