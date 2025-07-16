@@ -50,8 +50,11 @@ MODEL_PATH = "models/shape_predictor_68_face_landmarks.dat"
 HF_MODEL_URL = "https://huggingface.co/Smiti24/Model/resolve/main/shape_predictor_68_face_landmarks.dat"
 predictor = None
 detector = None
-def ensure_predictor_downloaded():
-    """Download the dlib predictor model from Hugging Face if not already present."""
+def get_predictor_and_detector():
+    global predictor, detector
+    if predictor is not None and detector is not None:
+        return predictor, detector
+
     if not os.path.exists(MODEL_PATH):
         os.makedirs(os.path.dirname(MODEL_PATH), exist_ok=True)
         response = requests.get(HF_MODEL_URL, stream=True)
@@ -62,10 +65,11 @@ def ensure_predictor_downloaded():
         else:
             raise Exception(f"Failed to download model from Hugging Face: {response.status_code}")
 
+    predictor = dlib.shape_predictor(MODEL_PATH)
+    detector = dlib.get_frontal_face_detector()
+    return predictor, detector
 
-ensure_predictor_downloaded()
-predictor = dlib.shape_predictor(MODEL_PATH)
-detector = dlib.get_frontal_face_detector()
+
 
 
 class User(UserMixin, db.Model):
@@ -462,6 +466,7 @@ def process_necklace():
         image1 = necklace[y:h, x:w]
     except Exception as e:
         return jsonify({'error': f'Failed to crop necklace: {str(e)}'})
+    predictor, detector = get_predictor_and_detector()
 
     gray = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
     rects = detector(gray, 1)
@@ -622,8 +627,10 @@ def process_lips():
 
     def get_lip_landmark(img):
         """Finds lip landmarks and returns a list of corresponding coordinates."""
+        predictor, detector = get_predictor_and_detector()
         gray_img = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
         faces = detector(gray_img)
+
     
         for face in faces:
             landmarks = predictor(gray_img, face)
