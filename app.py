@@ -627,6 +627,7 @@ def process_lips():
         detector = dlib.get_frontal_face_detector()
         url = "https://drive.google.com/uc?id=1Y3ACTjJCPvYaNTTHRXJRQBqAt5wvDLjq"
         output_path = "models/shape_predictor_68_face_landmarks.dat"
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)  # ✅ Create models/ if it doesn't exist
         gdown.download(url, output_path, quiet=False)
         predictor = dlib.shape_predictor("models/shape_predictor_68_face_landmarks.dat")
         gray_img = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
